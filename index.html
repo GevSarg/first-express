@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #282c34;
+        color: #ffffff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 3em;
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
+      }
+
+      .buttons {
+        display: flex;
+        gap: 15px;
+      }
+
+      button {
+        background-color: #61dafb;
+        border: none;
+        border-radius: 5px;
+        color: #282c34;
+        font-weight: 700;
+
+        padding: 20px 30px;
+        font-size: 1.2em;
+        cursor: pointer;
+        transition: background-color 0.3s, transform 0.2s;
+      }
+
+      button:hover {
+        background-color: #21a1f1;
+        transform: scale(1.05);
+        filter: drop-shadow(2px 10px 5px rgba(0, 0, 0, 0.5));
+      }
+
+      button:active {
+        transform: scale(0.95);
+      }
+
+      button:focus {
+        outline: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Welcome to Node Server</h1>
+    <div class="buttons">
+      <button id="addUserButton" type="button">Add User</button>
+      <button id="putUserButton" type="button">Update(PUT) User</button>
+      <button id="patchUserButton" type="button">Update(Patch) User</button>
+      <button id="delUserButton" type="button">Delete User</button>
+    </div>
+
+    <script>
+      const users = {
+        newUser: {
+          name: "James Brown",
+          age: 32,
+          email: "j.brown@xample.com",
+        },
+        putUser: {
+          id: 19,
+          name: "James Allen",
+          age: 30,
+          email: "james.allen@example.com",
+        },
+        patchUser: {
+          id: 5,
+          age: 1000,
+        },
+      };
+
+      function manageUser(url, method, user, action) {
+        fetch(url, {
+          method: method,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: method !== "DELETE" ? JSON.stringify(user) : null,
+        })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return response.json();
+          })
+          .then((data) => {
+            console.log("Success:", data);
+            alert(`User ${action} successfully!`);
+            window.location.reload();
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+            alert(`Failed to ${action} user!`);
+          });
+      }
+
+      function createEvent(url, id, method, user, action) {
+        document
+          .getElementById(id)
+          .addEventListener("click", () =>
+            manageUser(url, method, user, action)
+          );
+      }
+
+      createEvent(
+        "http://localhost:4000/users",
+        "addUserButton",
+        "POST",
+        users.newUser,
+        "added"
+      );
+      createEvent(
+        `http://localhost:4000/users/${users.putUser.id}`,
+        "putUserButton",
+        "PUT",
+        users.putUser,
+        "updated"
+      );
+      createEvent(
+        `http://localhost:4000/users/${users.patchUser.id}`,
+        "patchUserButton",
+        "PATCH",
+        users.patchUser,
+        "patched"
+      );
+      createEvent(
+        "http://localhost:4000/users/1",
+        "delUserButton",
+        "DELETE",
+        {},
+        "deleted"
+      );
+    </script>
+  </body>
+</html>
