@@ -84,7 +84,7 @@
         },
       };
 
-      function manageUser(url, method, user, action) {
+      function manageUser(url, method, user) {
         fetch(url, {
           method: method,
           headers: {
@@ -96,55 +96,49 @@
             if (!response.ok) {
               throw new Error(`HTTP error! status: ${response.status}`);
             }
+            location.reload();
 
             return response.json();
           })
           .then((data) => {
             console.log("Success:", data);
-            alert(`User ${action} successfully!`);
-            window.location.reload();
           })
           .catch((error) => {
             console.error("Error:", error);
-            alert(`Failed to ${action} user!`);
           });
       }
 
-      function createEvent(url, id, method, user, action) {
+      console.log(`http://localhost:4000/users/${users.patchUser.id}`);
+
+      function createEvent(url, id, method, user) {
         document
           .getElementById(id)
-          .addEventListener("click", () =>
-            manageUser(url, method, user, action)
-          );
+          .addEventListener("click", () => manageUser(url, method, user));
       }
 
       createEvent(
         "http://localhost:4000/users",
         "addUserButton",
         "POST",
-        users.newUser,
-        "added"
+        users.newUser
       );
       createEvent(
         `http://localhost:4000/users/${users.putUser.id}`,
         "putUserButton",
         "PUT",
-        users.putUser,
-        "updated"
+        users.putUser
       );
       createEvent(
         `http://localhost:4000/users/${users.patchUser.id}`,
         "patchUserButton",
         "PATCH",
-        users.patchUser,
-        "patched"
+        users.patchUser
       );
       createEvent(
         "http://localhost:4000/users/1",
         "delUserButton",
         "DELETE",
-        {},
-        "deleted"
+        {}
       );
     </script>
   </body>

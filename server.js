@@ -2,6 +2,12 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import {
+  readJSONFile,
+  writeJSONFile,
+  updateData,
+  filterData,
+} from "./functions.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,7 +18,6 @@ app.use(printTime, express.json());
 
 function printTime(req, res, next) {
   console.log(new Date().toLocaleDateString());
-  console.log(new Date().toLocaleTimeString());
   next();
 }
 
@@ -24,212 +29,83 @@ app.get("/", (req, res) => {
     })
     .catch((err) => {
       console.error(err);
-      res.status(404).send("failed to load html file");
+      res.status(404).send("Failed to load HTML file");
     });
 });
 
-app.get("/users", (req, res) => {
+app.get("/users", async (req, res) => {
   const { name, age, email, minAge, maxAge, order } = req.query;
-  console.log(req.query);
-
-  fs.promises
-    .readFile(path.join(__dirname, "./user.json"), "utf-8")
-    .then((data) => {
-      const users = JSON.parse(data);
-      const filteredUsers = users.filter((user) => {
-        let isMatch = true;
-
-        if (name && !user.name.toLowerCase().includes(name.toLowerCase())) {
-          isMatch = false;
-        }
-
-        if (age && user.age !== +age) {
-          isMatch = false;
-        }
-
-        if (email && !user.email.toLowerCase().includes(email.toLowerCase())) {
-          isMatch = false;
-        }
-
-        if (minAge && user.age < +minAge) {
-          isMatch = false;
-        }
-
-        if (maxAge && user.age > +maxAge) {
-          isMatch = false;
-        }
-
-        return isMatch;
-      });
-      if (order) {
-        switch (order) {
-          case "asc":
-            filteredUsers.toSorted((a, b) => a.age - b.age);
-            break;
-          case "desc":
-            filteredUsers.toSorted((a, b) => b.age - a.age);
-            break;
-          default:
-            break;
-        }
-      }
-
-      if (filteredUsers.length > 0) {
-        res.status(200).json(filteredUsers);
-      } else {
-        res.status(404).send("No users found with the specified criteria");
-      }
-    })
-    .catch(() => {
-      res.status(500).send("Failed to load JSON");
-    });
+  filterData(name, age, email, minAge, maxAge, order, res);
 });
 
-app.get("/users/:id", (req, res) => {
+app.get("/users/:id", async (req, res) => {
   const { id } = req.params;
-  fs.promises
-    .readFile(path.join(__dirname, "./user.json"), "utf-8")
-    .then((data) => {
-      const users = JSON.parse(data);
-      const user = users.find((u) => u.id === +id);
-      if (user) {
-        res.status(200).json(user);
-        // console.log(req.params);
-      } else {
-        res.status(404).send(`User with ID ${id} not found`);
-      }
-    })
-    .catch(() => {
-      res.status(500).send("failed to load Json");
-    });
+  try {
+    const users = await readJSONFile(path.join(__dirname, "./user.json"));
+    const user = users.find((u) => u.id === +id);
+
+    if (user) {
+      res.status(200).json(user);
+    } else {
+      res.status(404).send(`User with ID ${id} not found`);
+    }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
-app.post("/users", (req, res) => {
+app.post("/users", async (req, res) => {
   if (!req.is("application/json")) {
-    return res.status(400).send("Wrong type data");
+    return res.status(404).send("Wrong data type");
   }
 
   const newUser = req.body;
 
-  fs.promises
-    .readFile(path.join(__dirname, "./user.json"), "utf-8")
-    .then((data) => {
-      const users = JSON.parse(data);
-      let newId;
+  try {
+    const users = await readJSONFile(path.join(__dirname, "./user.json"));
 
-      if (users.length > 0) {
-        const maxId = Math.max(...users.map((user) => user.id));
-        newId = maxId + 1;
-      } else {
-        newId = 1;
-      }
+    newUser.id = users.length + 1;
+    users.push(newUser);
 
-      const userWithId = {
-        id: newId,
-        ...newUser,
-      };
+    await writeJSONFile(path.join(__dirname, "./user.json"), users);
 
-      users.push(userWithId);
-
-      return fs.promises.writeFile(
-        path.join(__dirname, "./user.json"),
-        JSON.stringify(users, null, 2)
-      );
-    })
-    .then(() => {
-      res.status(201).send("User successfully created");
-    })
-    .catch((err) => {
-      console.error(err);
-      res.status(500).send("Failed to add User");
-    });
+    res.status(201).send("User successfully created");
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
-app.put("/users/:id", (req, res) => {
+app.put("/users/:id", async (req, res) => {
   const { id } = req.params;
   const updatedUser = req.body;
-
-  fs.promises
-    .readFile(path.join(__dirname, "./user.json"), "utf-8")
-    .then((data) => {
-      const users = JSON.parse(data);
-      const userIndex = users.findIndex((u) => u.id === +id);
-
-      if (userIndex === -1) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      users[userIndex] = { ...users[userIndex], ...updatedUser };
-
-      return fs.promises.writeFile(
-        path.join(__dirname, "./user.json"),
-        JSON.stringify(users, null, 2)
-      );
-    })
-    .then(() => {
-      res.status(200).json("User updated successfully");
-    })
-    .catch((err) => {
-      console.error(err);
-      res.status(500).json("Failed to update user");
-    });
+  updateData(id, updatedUser, res);
 });
-app.patch("/users/:id", (req, res) => {
+
+app.patch("/users/:id", async (req, res) => {
   const { id } = req.params;
-  const updates = req.body;
-
-  fs.promises
-    .readFile(path.join(__dirname, "./user.json"), "utf-8")
-    .then((data) => {
-      const users = JSON.parse(data);
-      const userIndex = users.findIndex((u) => u.id === +id);
-
-      if (userIndex === -1) {
-        return res.status(404).json("User not found");
-      }
-
-      users[userIndex] = { ...users[userIndex], ...updates };
-
-      return fs.promises.writeFile(
-        path.join(__dirname, "./user.json"),
-        JSON.stringify(users, null, 2)
-      );
-    })
-    .then(() => {
-      res.status(200).json("User updated successfully");
-    })
-    .catch((err) => {
-      console.error(err);
-      res.status(500).json("Failed to update user");
-    });
+  const updatedUser = req.body;
+  updateData(id, updatedUser, res);
 });
-app.delete("/users/:id", (req, res) => {
+
+app.delete("/users/:id", async (req, res) => {
   const { id } = req.params;
 
-  fs.promises
-    .readFile(path.join(__dirname, "./user.json"), "utf-8")
-    .then((data) => {
-      const users = JSON.parse(data);
-      const userIndex = users.findIndex((u) => u.id === +id);
+  try {
+    const users = await readJSONFile(path.join(__dirname, "./user.json"));
+    const userIndex = users.findIndex((u) => u.id === +id);
 
-      if (userIndex === -1) {
-        return res.status(404).json("User not found");
-      }
+    if (userIndex === -1) {
+      return res.status(404).json("User not found");
+    }
 
-      users.splice(userIndex, 1);
+    users.splice(userIndex, 1);
 
-      return fs.promises.writeFile(
-        path.join(__dirname, "./user.json"),
-        JSON.stringify(users, null, 2)
-      );
-    })
-    .then(() => {
-      res.status(204).send("User Deleted");
-    })
-    .catch((err) => {
-      console.error(err);
-      res.status(500).json("Failed to delete user");
-    });
+    await writeJSONFile(path.join(__dirname, "./user.json"), users);
+
+    res.status(204).send("User deleted");
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
 });
 
 app.listen(4000, () => console.log("Server is running!"));
